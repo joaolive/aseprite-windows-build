@@ -1,0 +1,48 @@
+name: Build Aseprite (Windows)
+
+# Permite rodar o script manualmente pelo painel do GitHub
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Aseprite
+        uses: actions/checkout@v4
+        with:
+          repository: aseprite/aseprite
+          submodules: recursive
+          # O fetch-depth: 0 garante que as tags sejam baixadas para a versão aparecer corretamente no software
+          fetch-depth: 0
+
+      - name: Instalar Ninja
+        uses: seanmiddleditch/gha-setup-ninja@master
+
+      - name: Configurar MSVC (Microsoft Visual C++)
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Baixar e extrair Skia
+        run: |
+          Invoke-WebRequest -Uri https://github.com/aseprite/skia/releases/download/m102-861e4743af/Skia-Windows-Release-x64.zip -OutFile skia.zip
+          Expand-Archive skia.zip -DestinationPath C:\deps\skia
+
+      - name: Configurar CMake e Compilar
+        run: |
+          mkdir build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo `
+                -DLAF_BACKEND=skia `
+                -DSKIA_DIR=C:\deps\skia `
+                -DSKIA_LIBRARY_DIR=C:\deps\skia\out\Release-x64 `
+                -DSKIA_LIBRARY=C:\deps\skia\out\Release-x64\skia.lib `
+                -G Ninja ..
+          ninja aseprite
+
+      - name: Empacotar e Fazer Upload do Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aseprite-Windows-Build
+          # Faz o upload de toda a pasta bin, que inclui o .exe e a pasta /data/ (essencial para a UI funcionar)
+          path: build/bin/
